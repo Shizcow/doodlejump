@@ -1,4 +1,4 @@
-// accel libs
+#include <list>
 
 #include <MPU6050_tockn.h>
 #include <Wire.h>
@@ -26,7 +26,6 @@ MPU6050 mpu6050(Wire);
 #define WHITE 0xFFFF
 #define ORANGE 0xFD20
 #define GREENYELLOW 0xAFE5
-#define PINK 0xF81F
 
 MCUFRIEND_kbv tft(A3, A2, A1, A0, A4);  
 
@@ -58,8 +57,9 @@ struct Platform{
   int16_t x;
   int16_t y;
   int16_t w;
+  boolean visable;
 };
-Platform platforms[10];
+std::list<Platform> platforms;
 
 void setup() {
   Serial.begin(115200);
@@ -71,13 +71,17 @@ void setup() {
   mpu6050.begin();
   mpu6050.calcGyroOffsets(true);
 #endif
-
-  for(int i=0; i<10; ++i)
-    platforms[i].y = -1;
+  Platform first;
+  first.y = HEIGHT+100;
+  first.w = 10+rand()%30;
+  first.x = rand()%(WIDTH-first.w);
+  first.visable = false;
+  platforms.push_back(first);
 }
 
 
 void loop() {
+  //delay(1);
 #if USEGYRO == 1
   mpu6050.update();
   Serial.println("\nangleX: " );
@@ -87,7 +91,6 @@ void loop() {
   Serial.print("\tangleZ: " );
   Serial.print(mpu6050.getAngleZ());
 #endif
-
   // presenting the platforms:
   /*
     Store an amount, maybe dynamic (could use data structures)
@@ -95,29 +98,35 @@ void loop() {
     only store platforms so far below and above
     when player moves, platforms are generated
    */
-
-  if(rand()%100 < 5){
-    for(int i=0; i<10; ++i){
-      if(platforms[i].y == -1){
-	platforms[i].w = 10+rand()%20;
-	platforms[i].x = rand()%(WIDTH-platforms[i].w);
-	platforms[i].y = HEIGHT;
-	vtft.fillRect(platforms[i].x, platforms[i].y, platforms[i].w, 1, WHITE);
-	break;
-      }
-    }
-  }
   
-  for(int i=0; i<10; ++i){
-    if(platforms[i].y != -1){
-      platforms[i].y--;
-      if(platforms[i].y == -1){
-	vtft.fillRect(platforms[i].x, platforms[i].y+1, platforms[i].w, 1, BLACK);
-      } 
-    }
+  if(rand()%100<3){ // spawn new
+    Platform spawn;
+    spawn.y = HEIGHT+100;
+    spawn.w = 10+rand()%30;
+    spawn.x = rand()%(WIDTH-spawn.w);
+    spawn.visable = false;
+    platforms.push_back(spawn);
   }
 
-  
+  // update platform positions
+  for(std::list<Platform>::const_iterator iterator = platforms.begin(), end = platforms.end(); iterator != end;){
+    Platform &platform = *iterator;
+    platform.y--;
+    
+    if(platform.y<-100 || platform.y>HEIGHT+100){ // too far down or high up
+      iterator=platforms.erase(iterator);
+      continue;
+    }
+    if(((platform.y<0) || (platform.y>(HEIGHT-1))) && platform.visable){ // off screen but still drawn
+      vtft.fillRect(platform.x, platform.y, platform.w, 1, BLACK);
+      platform.visable = false;
+    }
+    if(!((platform.y<0) || (platform.y>(HEIGHT-1))) && !platform.visable){ // on screen, but not drawn
+      vtft.fillRect(platform.x, platform.y, platform.w, 1, WHITE);
+      platform.visable = true;
+    }
+    ++iterator;
+  }
   
   //vtft.fillRect(0, 0, WIDTH, 1, RED);
   vtft.vertScroll(0, HEIGHT, 1);
