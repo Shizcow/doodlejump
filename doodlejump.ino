@@ -233,7 +233,7 @@ class Player{
     }
     clearRect(left, bottom, right, top);
   }
-  void calc_next_pos(double time){
+  boolean calc_next_pos(double time){
     prev_x = x;
     prev_y = y; // store last coordinates in order to rerender properly
 
@@ -291,12 +291,12 @@ class Player{
       x=WIDTH+x;
     x = fmod(x,WIDTH);
     
-    if(y<0){ // remove after making loss possible
-      y=0;
-      y_speed=350;
+    if(y<0){
+      return false;
     }
     
     render();
+    return true;
   }
   void clearRect(uint16_t left, uint16_t bottom, uint16_t right, uint16_t top){
     left--;bottom--;top++;right++;
@@ -349,6 +349,24 @@ void loop() {
 
   delay(1);
 
-  player.calc_next_pos(0.01);
+  if(!player.calc_next_pos(0.01)){ //game over -- reset
+    tft.fillScreen(BLACK);
+    player.x = (WIDTH-player.width)/2;
+    player.y = 150;
+    player.prev_x = player.x;
+    player.prev_y = player.y;
+    player.x_speed = 0;
+    player.y_speed = 0;
+    platforms.clear();
+    scroll_and_generate(HEIGHT); // create a fresh set of platforms
+    // create a floor for the player to start on
+    Platform floor;
+    floor.y = 0;
+    floor.w = WIDTH-1;
+    floor.x = 0;
+    platforms.push_back(floor);
+    vtft.fillRect(floor.x, floor.y, floor.w, 1, WHITE);
+    player.force_render();
+  }
 
 }
