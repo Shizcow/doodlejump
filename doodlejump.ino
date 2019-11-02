@@ -1,4 +1,5 @@
 #include <list>
+#include <cmath>
 
 #include <MPU6050_tockn.h>
 #include <Wire.h>
@@ -54,12 +55,239 @@ class Vtft{
 Vtft vtft(tft);
 
 struct Platform{
-  int16_t x;
-  int16_t y;
-  int16_t w;
+  uint16_t x;
+  uint16_t y;
+  uint16_t w;
   boolean visable;
 };
 std::list<Platform> platforms;
+
+int t=0;
+void scroll_and_generate(uint16_t distance){
+  // first, update old platforms
+  for(std::list<Platform>::const_iterator iterator = platforms.begin(), end = platforms.end(); iterator != end;){
+    Platform &platform = *iterator;
+
+    // undraw/remove platforms that are about to go off screen
+    if(platform.y<distance){
+      vtft.fillRect(platform.x, platform.y, platform.w, 1, BLACK);
+      iterator=platforms.erase(iterator);
+      continue;
+    }
+
+    // move all the remaining ones down
+    platform.y-=distance;
+    ++iterator;
+  }
+
+  // do the scrolling
+  vtft.vertScroll(0, HEIGHT, distance);
+  
+  // finally, draw new ones
+  uint16_t i = HEIGHT-1;
+  do{
+    if(rand()%100<10){
+      Platform spawn;
+      spawn.y = i;
+      spawn.w = 10+rand()%30;
+      spawn.x = rand()%(WIDTH-spawn.w);
+      platforms.push_back(spawn);
+      vtft.fillRect(spawn.x, spawn.y, spawn.w, 1, WHITE);
+    }
+  }while(i-->(HEIGHT-distance));
+
+}
+
+class Player{
+ public:
+  Player(){
+    width=25;
+    height=25;
+    x = (WIDTH-width)/2;
+    y = 50;
+    prev_x = x;
+    prev_y = y;
+    x_speed = 1; // measured in pixels per second
+    y_speed = 0; // measured in pixels per second
+    y_accel = -2500; // measured in pixels per second^2
+    color = BLUE;
+  }
+  void render(){
+    //vtft.fillRect(prev_x, prev_y, width, height, BLACK);
+    //vtft.fillRect(x, y, width, height, BLUE);
+    // calculate bounding boxes
+    
+    /* First, calculate new area to fill with player
+       Done in 2 steps (only if overlapping):
+
+             NEW AREA
+             _________
+            |  :      |
+            |1 :  2   |
+      ______|__:      |
+     |      |0 |      |
+     |      |__|______|
+     |  4   :  |
+     |      :3 |
+     |______:__|
+      OLD AREA
+
+             OLD AREA
+             _________
+            |  :      |
+            |3 :  4   |
+      ______|__:      |
+     |      |0 |      |
+     |      |__|______|
+     |  2   :  |
+     |      :1 |
+     |______:__|
+      NEW AREA
+
+     Region 0 is ignored, as we don't need to write to those pixels
+     Region 1 and 2 will be rendered as seperate rectangles to keep command count low
+     */
+    int16_t left;
+    int16_t bottom;
+    int16_t right;
+    int16_t top;
+    // bounding box 1
+    if(y>prev_y){
+      top = y+height;
+      bottom = prev_y+height;
+      if(bottom < y)
+	bottom = y;
+    } else {
+      top = prev_y;
+      bottom = y;
+      if(top > y+height)
+	top = y+height;
+    }
+    if(x>prev_x){
+      left = x;
+      right = prev_x+width;
+    } else {
+      left = prev_x;
+      right = x+width;
+    }
+    if(right-left > 0) // make sure boxes overlap
+      vtft.fillRect(left, bottom, right-left, top-bottom, color);
+    // bounding box 2
+    top   = y+height;
+    bottom = y;
+    if(x>prev_x){
+      left = prev_x+width;
+      right   = x+width;
+      if(left < x)
+	left = x;
+    } else {
+      left = x;
+      right = prev_x;
+      if(right>x+width)
+	right = x+width;
+    }
+    vtft.fillRect(left, bottom, right-left, top-bottom, color);
+    // bounding box 3
+    if(y>prev_y){
+      top   = y;
+      bottom = prev_y;
+      if(top > prev_y+height)
+	top = prev_y+height;
+    } else {
+      top = prev_y+height;
+      bottom = y+height;
+      if(bottom < prev_y)
+	bottom = prev_y;
+    }
+    if(x>prev_x){
+      left = x;
+      right = prev_x+width;
+    } else {
+      left = prev_x;
+      right = x+width;
+    }
+    if(right-left > 0) // make sure boxes overlap
+      clearRect(left, bottom, right, top);
+    // bounding box 4
+    top   = prev_y+height;
+    bottom = prev_y;  
+    if(x>prev_x){
+      left = prev_x;
+      right = x;
+      if(right > prev_x+width)
+	right = prev_x+width;
+    } else {
+      left = x+width;
+      right = prev_x+width;
+      if(left < prev_x)
+	left = prev_x;
+    }
+    clearRect(left, bottom, right, top);
+  }
+  void calc_next_pos(double time){
+    prev_x = x;
+    prev_y = y; // store last coordinates in order to rerender properly
+
+    x = std::fmod(x+x_speed,WIDTH); // modulus for wrap around
+
+    y_speed+=y_accel*time;
+    y+=y_speed*time;
+
+    // check for platforms to bounce off of
+    if(y_speed<0){ // but only if player is falling down
+      for(std::list<Platform>::const_iterator iterator = platforms.begin(), end = platforms.end(); iterator != end; iterator++){
+	Platform &platform = *iterator;
+	if(platform.y < prev_y && platform.y > y){ // it's in our path down
+	  /* the X calculation is a bit more complicated. We need to see if the platform is in any part of our projected path
+	     to do so, we need to calculate the path by seeing where the projections of the bottom 2 lines intersect the y level of the platform:
+	     ......
+             :OLD :
+             :....:
+              .    .
+                .    .
+             .....x.==.x.....
+                    .    .
+                      .    .__
+                        . |NEW|
+                          !___!
+	     From there, bounds can be calculated and adjustments made
+	   */
+
+	  //calculate intercepts using point slope form
+	  double intercept_1 = (platform.y-prev_y)*(x-prev_x)/(y-prev_y)+x;
+	  double intercept_2 = intercept_1+width;
+
+	  if((platform.x >= intercept_1 && platform.x <= intercept_2) || (platform.x+width >= intercept_1 && platform.x+width <= intercept_2)){ // check for collision
+	    y = platform.y;
+	    y_speed = 1000;
+	  }
+	}
+      }
+    }
+
+    if(y > HEIGHT*2/3){ // time to move up
+      scroll_and_generate((uint32_t)y-HEIGHT*2/3); // adjust screen & clean up
+      y = (double)(uint32_t)HEIGHT*2/3; // adjust position relative to screen
+    }
+
+    render();
+  }
+ private:
+  void clearRect(uint16_t left, uint16_t bottom, uint16_t right, uint16_t top){
+    vtft.fillRect(left, bottom, right-left, top-bottom, BLACK);
+    // after clearing, check to see if there's any platforms we need to render again
+    for(std::list<Platform>::const_iterator iterator = platforms.begin(), end = platforms.end(); iterator != end; iterator++){
+      Platform &platform = *iterator;
+      if(platform.y <= top && platform.y >= bottom) // in same y-plane
+	if((left >= platform.x && left <= platform.x+platform.w) || (right >= platform.x && right <= platform.x+platform.w)) // x overlaps
+	  vtft.fillRect(platform.x, platform.y, platform.w, 1, WHITE); // it's just as fast to redraw the whole platform
+    }
+  }
+  double x, y, x_speed, y_speed, y_accel, width, height, prev_x, prev_y; // relative to screen
+  uint16_t color;
+};
+
+Player player;
 
 void setup() {
   Serial.begin(115200);
@@ -71,12 +299,15 @@ void setup() {
   mpu6050.begin();
   mpu6050.calcGyroOffsets(true);
 #endif
-  Platform first;
-  first.y = HEIGHT+100;
-  first.w = 10+rand()%30;
-  first.x = rand()%(WIDTH-first.w);
-  first.visable = false;
-  platforms.push_back(first);
+  scroll_and_generate(HEIGHT);
+  // create a floor for the player to start on
+  Platform floor;
+  floor.y = 0;
+  floor.w = WIDTH-1;
+  floor.x = 0;
+  platforms.push_back(floor);
+  vtft.fillRect(floor.x, floor.y, floor.w, 1, WHITE);
+  player.render();
 }
 
 
@@ -91,6 +322,12 @@ void loop() {
   Serial.print("\tangleZ: " );
   Serial.print(mpu6050.getAngleZ());
 #endif
+
+  delay(1);
+
+  player.calc_next_pos(0.01);
+  
+  //scroll_and_generate(5);
   // presenting the platforms:
   /*
     Store an amount, maybe dynamic (could use data structures)
@@ -98,7 +335,7 @@ void loop() {
     only store platforms so far below and above
     when player moves, platforms are generated
    */
-  
+  /*
   if(rand()%100<3){ // spawn new
     Platform spawn;
     spawn.y = HEIGHT+100;
@@ -126,10 +363,10 @@ void loop() {
       platform.visable = true;
     }
     ++iterator;
-  }
+    }*/
   
   //vtft.fillRect(0, 0, WIDTH, 1, RED);
-  vtft.vertScroll(0, HEIGHT, 1);
+  //vtft.vertScroll(0, HEIGHT, 1);
   
   delay(10);
 
