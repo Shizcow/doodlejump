@@ -344,7 +344,7 @@ void loop() {
   //delay(1);
 #if USEGYRO == 1
   mpu6050.update();
-  player.x_speed = mpu6050.getAngleZ()/10;
+  player.x_speed = (mpu6050.getAngleX()-23)/10;
 #endif
 
   delay(1);
