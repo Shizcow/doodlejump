@@ -45,7 +45,13 @@ class Vtft{
     _tft->vertScroll(top, scrollines, v_offset);
   }
   void fillRect(int16_t x, int16_t y, int16_t w, int16_t h, uint16_t color){
-    _tft->fillRect(x, (y+v_offset)%HEIGHT, w, h, color);
+    y=(y+v_offset)%HEIGHT;
+    if(y+h>HEIGHT){ // need to split up across hardware boundary
+      _tft->fillRect(x, y, w, (HEIGHT)-y, color);
+      _tft->fillRect(x, 0, w, h-(HEIGHT)+y, color);
+    } else {
+      _tft->fillRect(x, y, w, h, color);
+    }
   }
  private:
   uint16_t v_offset;
@@ -116,7 +122,7 @@ class Player{
     vtft.fillRect(prev_x, prev_y, width, height, color);
   }
   void render(){
-    if(x == prev_x && y == prev_y)
+    if((uint16_t)x == (uint16_t)prev_x && (uint16_t)y == (uint16_t)prev_y)
       return;
     
     /* First, calculate new area to fill with player
@@ -189,7 +195,7 @@ class Player{
       if(right>x+width)
 	right = x+width;
     }
-    vtft.fillRect(left, bottom, right-left, top-bottom, GREEN);
+    vtft.fillRect(left, bottom, right-left, top-bottom, RED);
     // bounding box 3
     if(y>prev_y){
       top   = y;
@@ -293,6 +299,7 @@ class Player{
     render();
   }
   void clearRect(uint16_t left, uint16_t bottom, uint16_t right, uint16_t top){
+    left--;bottom--;top++;right++;
     vtft.fillRect(left, bottom, right-left, top-bottom, BLACK);
     // after clearing, check to see if there's any platforms we need to render again
     for(std::list<Platform>::const_iterator iterator = platforms.begin(), end = platforms.end(); iterator != end; iterator++){
@@ -337,9 +344,7 @@ void loop() {
   //delay(1);
 #if USEGYRO == 1
   mpu6050.update();
-  Serial.println("\nangleX: " );
-  Serial.print(mpu6050.getAngleX());
-  player.x_speed = -mpu6050.getAngleX()/10;
+  player.x_speed = mpu6050.getAngleZ()/10;
 #endif
 
   delay(1);
