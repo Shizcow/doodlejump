@@ -30,7 +30,7 @@ MPU6050 mpu6050(Wire);
 
 MCUFRIEND_kbv tft(A3, A2, A1, A0, A4);  
 
-#define USEGYRO 0
+#define USEGYRO 1
 #define HEIGHT 320
 #define WIDTH 240
 
@@ -116,9 +116,8 @@ class Player{
     vtft.fillRect(prev_x, prev_y, width, height, color);
   }
   void render(){
-    //vtft.fillRect(prev_x, prev_y, width, height, BLACK);
-    //vtft.fillRect(x, y, width, height, BLUE);
-    // calculate bounding boxes
+    if(x == prev_x && y == prev_y)
+      return;
     
     /* First, calculate new area to fill with player
        Done in 2 steps (only if overlapping):
@@ -282,6 +281,10 @@ class Player{
       y = (double)(uint32_t)HEIGHT*2/3;
     }
 
+    if(x<0)
+      x=WIDTH+x;
+    x = fmod(x,WIDTH);
+    
     if(y<0){ // remove after making loss possible
       y=0;
       y_speed=350;
@@ -289,7 +292,6 @@ class Player{
     
     render();
   }
- private:
   void clearRect(uint16_t left, uint16_t bottom, uint16_t right, uint16_t top){
     vtft.fillRect(left, bottom, right-left, top-bottom, BLACK);
     // after clearing, check to see if there's any platforms we need to render again
@@ -297,7 +299,9 @@ class Player{
       Platform &platform = *iterator;
       if(platform.y <= top && platform.y >= bottom) // in same y-plane
 	if((left >= platform.x && left <= platform.x+platform.w)
-	   || (right >= platform.x && right <= platform.x+platform.w)) // x overlaps
+	   || (right >= platform.x && right <= platform.x+platform.w)
+	   || (platform.x >= left && platform.x <= right)
+	   || (platform.x+platform.w >= left && platform.x+platform.w <= right)) // x overlaps
 	  vtft.fillRect(platform.x, platform.y, platform.w, 1, WHITE); // it's just as fast to redraw the whole platform
     }
   }
@@ -335,10 +339,7 @@ void loop() {
   mpu6050.update();
   Serial.println("\nangleX: " );
   Serial.print(mpu6050.getAngleX());
-  Serial.print("\tangleY: " );
-  Serial.print(mpu6050.getAngleY());
-  Serial.print("\tangleZ: " );
-  Serial.print(mpu6050.getAngleZ());
+  player.x_speed = -mpu6050.getAngleX()/10;
 #endif
 
   delay(1);
