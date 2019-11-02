@@ -198,13 +198,13 @@ class Player{
     vtft.fillRect(left, bottom, right-left, top-bottom, RED);
     // bounding box 3
     if(y>prev_y){
-      top   = y;
+      top   = y-1;
       bottom = prev_y;
       if(top > prev_y+height)
 	top = prev_y+height;
     } else {
       top = prev_y+height;
-      bottom = y+height;
+      bottom = y+height+1;
       if(bottom < prev_y)
 	bottom = prev_y;
     }
@@ -222,11 +222,11 @@ class Player{
     bottom = prev_y;  
     if(x>prev_x){
       left = prev_x;
-      right = x;
+      right = x-1;
       if(right > prev_x+width)
 	right = prev_x+width;
     } else {
-      left = x+width;
+      left = x+width+1;
       right = prev_x+width;
       if(left < prev_x)
 	left = prev_x;
