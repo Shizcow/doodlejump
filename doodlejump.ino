@@ -86,7 +86,7 @@ void scroll_and_generate(uint16_t distance){
   // finally, draw new ones
   uint16_t i = HEIGHT-1;
   do{
-    if(rand()%100<10){
+    if(rand()%100<5){
       Platform spawn;
       spawn.y = i;
       spawn.w = 10+rand()%30;
@@ -107,9 +107,9 @@ class Player{
     y = 150;
     prev_x = x;
     prev_y = y;
-    x_speed = 0; // measured in pixels per second
+    x_speed = 0.1; // measured in pixels per second
     y_speed = 0; // measured in pixels per second
-    y_accel = -2500; // measured in pixels per second^2
+    y_accel = -250; // measured in pixels per second^2
     color = BLUE;
   }
   void force_render(){
@@ -238,7 +238,7 @@ class Player{
     y+=y_speed*time;
 
     // check for platforms to bounce off of
-    if(y_speed<0){ // but only if player is falling down
+    if(y_speed<=0){ // but only if player is falling down
       for(std::list<Platform>::const_iterator iterator = platforms.begin(), end = platforms.end(); iterator != end; iterator++){
 	Platform &platform = *iterator;
 	if(platform.y < prev_y && platform.y > y){ // it's in our path down
@@ -270,7 +270,7 @@ class Player{
 	     || (intercept_1 >= platform.x && intercept_1 <= platform.x+platform.w)
 	     || (intercept_2 >= platform.x && intercept_2 <= platform.x+platform.w)){ // check for collision
 	    y = platform.y+1;
-	    y_speed = 1000;
+	    y_speed = 250;
 	  }
 	}
       }
@@ -293,7 +293,7 @@ class Player{
       if(platform.y <= top && platform.y >= bottom) // in same y-plane
 	if((left >= platform.x && left <= platform.x+platform.w)
 	   || (right >= platform.x && right <= platform.x+platform.w)) // x overlaps
-	  vtft.fillRect(platform.x, platform.y, platform.w, 1, GREEN); // it's just as fast to redraw the whole platform
+	  vtft.fillRect(platform.x, platform.y, platform.w, 1, WHITE); // it's just as fast to redraw the whole platform
     }
   }
   double x, y, x_speed, y_speed, y_accel, width, height, prev_x, prev_y; // relative to screen
@@ -312,16 +312,14 @@ void setup() {
   mpu6050.begin();
   mpu6050.calcGyroOffsets(true);
 #endif
-  //scroll_and_generate(HEIGHT); // create a fresh set of platforms
+  scroll_and_generate(HEIGHT); // create a fresh set of platforms
   // create a floor for the player to start on
   Platform floor;
-  for(int i=0; i<10; ++i){
-    floor.y = 10*i;
-    floor.w = WIDTH-1;
-    floor.x = 0;
-    platforms.push_back(floor);
-    vtft.fillRect(floor.x, floor.y, floor.w, 1, WHITE);
-  }
+  floor.y = 0;
+  floor.w = WIDTH-1;
+  floor.x = 0;
+  platforms.push_back(floor);
+  vtft.fillRect(floor.x, floor.y, floor.w, 1, WHITE);
   player.force_render();
 }
 
@@ -341,48 +339,5 @@ void loop() {
   delay(1);
 
   player.calc_next_pos(0.01);
-  
-  //scroll_and_generate(5);
-  // presenting the platforms:
-  /*
-    Store an amount, maybe dynamic (could use data structures)
-    store as units, where y units are relative to the screen (can go into negatives -- these aren't rendered)
-    only store platforms so far below and above
-    when player moves, platforms are generated
-   */
-  /*
-  if(rand()%100<3){ // spawn new
-    Platform spawn;
-    spawn.y = HEIGHT+100;
-    spawn.w = 10+rand()%30;
-    spawn.x = rand()%(WIDTH-spawn.w);
-    spawn.visable = false;
-    platforms.push_back(spawn);
-  }
-
-  // update platform positions
-  for(std::list<Platform>::const_iterator iterator = platforms.begin(), end = platforms.end(); iterator != end;){
-    Platform &platform = *iterator;
-    platform.y--;
-    
-    if(platform.y<-100 || platform.y>HEIGHT+100){ // too far down or high up
-      iterator=platforms.erase(iterator);
-      continue;
-    }
-    if(((platform.y<0) || (platform.y>(HEIGHT-1))) && platform.visable){ // off screen but still drawn
-      vtft.fillRect(platform.x, platform.y, platform.w, 1, BLACK);
-      platform.visable = false;
-    }
-    if(!((platform.y<0) || (platform.y>(HEIGHT-1))) && !platform.visable){ // on screen, but not drawn
-      vtft.fillRect(platform.x, platform.y, platform.w, 1, WHITE);
-      platform.visable = true;
-    }
-    ++iterator;
-    }*/
-  
-  //vtft.fillRect(0, 0, WIDTH, 1, RED);
-  //vtft.vertScroll(0, HEIGHT, 1);
-  
-  delay(10);
 
 }
