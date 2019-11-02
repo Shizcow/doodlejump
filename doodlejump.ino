@@ -104,13 +104,16 @@ class Player{
     width=25;
     height=25;
     x = (WIDTH-width)/2;
-    y = 50;
+    y = 150;
     prev_x = x;
     prev_y = y;
-    x_speed = 1; // measured in pixels per second
+    x_speed = 0; // measured in pixels per second
     y_speed = 0; // measured in pixels per second
     y_accel = -2500; // measured in pixels per second^2
     color = BLUE;
+  }
+  void force_render(){
+    vtft.fillRect(prev_x, prev_y, width, height, color);
   }
   void render(){
     //vtft.fillRect(prev_x, prev_y, width, height, BLACK);
@@ -160,8 +163,9 @@ class Player{
     } else {
       top = prev_y;
       bottom = y;
-      if(top > y+height)
 	top = y+height;
+      left=0;
+      right=10;
     }
     if(x>prev_x){
       left = x;
@@ -171,7 +175,7 @@ class Player{
       right = x+width;
     }
     if(right-left > 0) // make sure boxes overlap
-      vtft.fillRect(left, bottom, right-left, top-bottom, color);
+      vtft.fillRect(left, bottom, right-left, top-bottom, RED);
     // bounding box 2
     top   = y+height;
     bottom = y;
@@ -186,7 +190,7 @@ class Player{
       if(right>x+width)
 	right = x+width;
     }
-    vtft.fillRect(left, bottom, right-left, top-bottom, color);
+    vtft.fillRect(left, bottom, right-left, top-bottom, GREEN);
     // bounding box 3
     if(y>prev_y){
       top   = y;
@@ -253,23 +257,31 @@ class Player{
 	     From there, bounds can be calculated and adjustments made
 	   */
 
-	  //calculate intercepts using point slope form
-	  double intercept_1 = (platform.y-prev_y)*(x-prev_x)/(y-prev_y)+x;
+	  //calculate intercepts by solving point slope form
+	  double y1 = prev_y;
+	  double y2 = y;
+	  double x1 = prev_x;
+	  double x2 = x;
+	  double intercept_1 = (platform.y-y1)*(x2-x1)/(y2-y1)+x1;
 	  double intercept_2 = intercept_1+width;
 
-	  if((platform.x >= intercept_1 && platform.x <= intercept_2) || (platform.x+width >= intercept_1 && platform.x+width <= intercept_2)){ // check for collision
-	    y = platform.y;
+	  if(true||(platform.x >= intercept_1 && platform.x <= intercept_2)
+	     || (platform.x+platform.w >= intercept_1 && platform.x+platform.w <= intercept_2)
+	     || (intercept_1 >= platform.x && intercept_1 <= platform.x+platform.w)
+	     || (intercept_2 >= platform.x && intercept_2 <= platform.x+platform.w)){ // check for collision
+	    y = platform.y+1;
 	    y_speed = 1000;
 	  }
 	}
       }
     }
-
+    
     if(y > HEIGHT*2/3){ // time to move up
-      scroll_and_generate((uint32_t)y-HEIGHT*2/3); // adjust screen & clean up
-      y = (double)(uint32_t)HEIGHT*2/3; // adjust position relative to screen
+      scroll_and_generate((uint32_t)y-HEIGHT*2/3); // adjust screen & clean up platforms
+      prev_y -= y-HEIGHT*2/3; // adjust position relative to screen
+      y = (double)(uint32_t)HEIGHT*2/3;
     }
-
+    
     render();
   }
  private:
@@ -279,8 +291,9 @@ class Player{
     for(std::list<Platform>::const_iterator iterator = platforms.begin(), end = platforms.end(); iterator != end; iterator++){
       Platform &platform = *iterator;
       if(platform.y <= top && platform.y >= bottom) // in same y-plane
-	if((left >= platform.x && left <= platform.x+platform.w) || (right >= platform.x && right <= platform.x+platform.w)) // x overlaps
-	  vtft.fillRect(platform.x, platform.y, platform.w, 1, WHITE); // it's just as fast to redraw the whole platform
+	if((left >= platform.x && left <= platform.x+platform.w)
+	   || (right >= platform.x && right <= platform.x+platform.w)) // x overlaps
+	  vtft.fillRect(platform.x, platform.y, platform.w, 1, GREEN); // it's just as fast to redraw the whole platform
     }
   }
   double x, y, x_speed, y_speed, y_accel, width, height, prev_x, prev_y; // relative to screen
@@ -299,15 +312,17 @@ void setup() {
   mpu6050.begin();
   mpu6050.calcGyroOffsets(true);
 #endif
-  scroll_and_generate(HEIGHT);
+  //scroll_and_generate(HEIGHT); // create a fresh set of platforms
   // create a floor for the player to start on
   Platform floor;
-  floor.y = 0;
-  floor.w = WIDTH-1;
-  floor.x = 0;
-  platforms.push_back(floor);
-  vtft.fillRect(floor.x, floor.y, floor.w, 1, WHITE);
-  player.render();
+  for(int i=0; i<10; ++i){
+    floor.y = 10*i;
+    floor.w = WIDTH-1;
+    floor.x = 0;
+    platforms.push_back(floor);
+    vtft.fillRect(floor.x, floor.y, floor.w, 1, WHITE);
+  }
+  player.force_render();
 }
 
 
