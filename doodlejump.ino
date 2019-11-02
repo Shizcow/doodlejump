@@ -265,7 +265,7 @@ class Player{
 	  double intercept_1 = (platform.y-y1)*(x2-x1)/(y2-y1)+x1;
 	  double intercept_2 = intercept_1+width;
 
-	  if(true||(platform.x >= intercept_1 && platform.x <= intercept_2)
+	  if((platform.x >= intercept_1 && platform.x <= intercept_2)
 	     || (platform.x+platform.w >= intercept_1 && platform.x+platform.w <= intercept_2)
 	     || (intercept_1 >= platform.x && intercept_1 <= platform.x+platform.w)
 	     || (intercept_2 >= platform.x && intercept_2 <= platform.x+platform.w)){ // check for collision
@@ -280,6 +280,11 @@ class Player{
       scroll_and_generate((uint32_t)y-HEIGHT*2/3); // adjust screen & clean up platforms
       prev_y -= y-HEIGHT*2/3; // adjust position relative to screen
       y = (double)(uint32_t)HEIGHT*2/3;
+    }
+
+    if(y<0){ // remove after making loss possible
+      y=0;
+      y_speed=350;
     }
     
     render();
