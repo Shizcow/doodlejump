@@ -70,6 +70,8 @@ std::list<Platform> platforms;
 
 int t=0;
 void scroll_and_generate(uint16_t distance){
+  if(distance == 0)
+    return;
   // first, update old platforms
   for(std::list<Platform>::const_iterator iterator = platforms.begin(), end = platforms.end(); iterator != end;){
     Platform &platform = *iterator;
@@ -318,6 +320,7 @@ class Player{
 
 Player player;
 
+int32_t gyro_meta_offset;
 void setup() {
   Serial.begin(115200);
   uint16_t ID = tft.readID();
@@ -337,6 +340,10 @@ void setup() {
   platforms.push_back(floor);
   vtft.fillRect(floor.x, floor.y, floor.w, 1, WHITE);
   player.force_render();
+#if USEGYRO == 1
+  mpu6050.update();
+  gyro_meta_offset = mpu6050.getAngleZ();
+#endif
 }
 
 
@@ -344,7 +351,7 @@ void loop() {
   //delay(1);
 #if USEGYRO == 1
   mpu6050.update();
-  player.x_speed = (mpu6050.getAngleX()-23)/10;
+  player.x_speed = (mpu6050.getAngleZ()-gyro_meta_offset)/5;
 #endif
 
   delay(1);
@@ -367,6 +374,8 @@ void loop() {
     platforms.push_back(floor);
     vtft.fillRect(floor.x, floor.y, floor.w, 1, WHITE);
     player.force_render();
+    mpu6050.update();
+    gyro_meta_offset = mpu6050.getAngleZ();
   }
 
 }
