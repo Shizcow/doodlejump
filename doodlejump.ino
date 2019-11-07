@@ -1,4 +1,5 @@
 // C++ libs
+#include <climits>
 #include <list>
 #include <cmath>
 // Accelerometer libs
@@ -74,42 +75,7 @@ struct Platform{
 };
 std::list<Platform> platforms;
 
-void scroll_and_generate(uint16_t distance){
-  // Scrolls the screen down, cleaning up any platforms that need to go off the bottom and generating new ones at the top
-  if(distance == 0)
-    return;
-  // first, update old platforms
-  for(std::list<Platform>::const_iterator iterator = platforms.begin(), end = platforms.end(); iterator != end;){
-    Platform &platform = *iterator; // step through the std::list
-
-    // undraw/remove platforms that are about to go off screen
-    if(platform.y<distance){
-      vtft.fillRect(platform.x, platform.y, platform.w, 1, BLACK);
-      iterator=platforms.erase(iterator);
-      continue;
-    }
-
-    // move all the remaining ones down
-    platform.y-=distance;
-    ++iterator;
-  }
-
-  // do the scrolling
-  vtft.vertScroll(0, HEIGHT, distance);
-  
-  // finally, draw new ones
-  uint16_t i = HEIGHT-1; // start at the top
-  do{
-    if(rand()%100<5){
-      Platform spawn; // new platform
-      spawn.y = i; // at given Y level, stepping down
-      spawn.w = 10+rand()%30; // of random width
-      spawn.x = rand()%(WIDTH-spawn.w); // and random position
-      platforms.push_back(spawn); // added to list
-      vtft.fillRect(spawn.x, spawn.y, spawn.w, 1, WHITE); // and drawn
-    }
-  }while(i-->(HEIGHT-distance));
-}
+void scroll_and_generate(uint16_t distance);
 
 // all the player physics and rendering is kept here
 class Player{
@@ -125,6 +91,7 @@ class Player{
     y_speed = 0; // measured in pixels per second
     y_accel = -250; // measured in pixels per second^2
     color = RED;
+    score = 0;
   }
   void force_render(){ // render without any fancy caluclations -- used for first render
     vtft.fillRect(prev_x, prev_y, width, height, color);
@@ -294,6 +261,7 @@ class Player{
     
     if(y > HEIGHT*2/3){ // check if player is getting too high up -- scroll screen down
       scroll_and_generate((uint32_t)y-HEIGHT*2/3); // adjust screen & clean up platforms
+      score += (unsigned long)y-HEIGHT*2/3;
       prev_y -= y-HEIGHT*2/3; // adjust position relative to screen
       y = (double)(uint32_t)HEIGHT*2/3;
     }
@@ -326,9 +294,52 @@ class Player{
   }
   double x, y, x_speed, y_speed, y_accel, width, height, prev_x, prev_y; // relative to screen
   uint16_t color;
+  unsigned long score;
 };
 
 Player player;
+
+void scroll_and_generate(uint16_t distance){
+  // Scrolls the screen down, cleaning up any platforms that need to go off the bottom and generating new ones at the top
+  static uint16_t empty_distance = 0; // make sure there's not a distance too greate to jump up
+  if(distance == 0)
+    return;
+  // first, update old platforms
+  for(std::list<Platform>::const_iterator iterator = platforms.begin(), end = platforms.end(); iterator != end;){
+    Platform &platform = *iterator; // step through the std::list
+
+    // undraw/remove platforms that are about to go off screen
+    if(platform.y<distance){
+      vtft.fillRect(platform.x, platform.y, platform.w, 1, BLACK);
+      iterator=platforms.erase(iterator);
+      continue;
+    }
+
+    // move all the remaining ones down
+    platform.y-=distance;
+    ++iterator;
+  }
+
+  // do the scrolling
+  vtft.vertScroll(0, HEIGHT, distance);
+  
+  // finally, draw new ones
+  uint16_t i = HEIGHT-distance; // start at the bottom
+  long rand_val;
+  do{
+    empty_distance++; // keep track of empty space
+    rand_val = random(0, 10000);
+    if(rand_val<1000*pow(2.71828183, -(double)player.score/1000) || empty_distance>100){ // enforce minimum platform distance
+      empty_distance = 0;
+      Platform spawn; // new platform
+      spawn.y = i; // at given Y level, stepping down
+      spawn.w = 10+rand()%30; // of random width
+      spawn.x = rand()%(WIDTH-spawn.w); // and random position
+      platforms.push_back(spawn); // added to list
+      vtft.fillRect(spawn.x, spawn.y, spawn.w, 1, WHITE); // and drawn
+    }
+  }while(i++<HEIGHT); // and work towards the top
+}
 
 int32_t gyro_meta_offset; // need a second offset because the gyro drifts a lot
 void setup() {
@@ -362,7 +373,7 @@ void loop() {
   mpu6050.update();
   player.x_speed = (mpu6050.getAngleZ()-gyro_meta_offset)/5;
 
-  delay(1); // delay just enough to make physics feel consistant
+  //delay(1); // delay just enough to make physics feel consistant
 
   if(!player.calc_next_pos(0.01)){ // calculate position. If this returns false (if statement is true), game over
     tft.fillScreen(BLACK); // clear the screen
