@@ -1,7 +1,22 @@
+#include "font.h"
+
 // C++ libs
 #include <climits>
 #include <list>
 #include <cmath>
+int16_t ilog2(uint16_t x)
+{
+    return sizeof(uint16_t) * CHAR_BIT - __builtin_clz(x) - 1;
+}
+int ipow(int x, int p)
+{
+  if (p == 0) return 1;
+  if (p == 1) return x;
+
+  int tmp = ipow(x, p/2);
+  if (p%2 == 0) return tmp * tmp;
+  else return x * tmp * tmp;
+}
 // Accelerometer libs
 #include <MPU6050_tockn.h>
 #include <Wire.h>
@@ -60,6 +75,10 @@ class Vtft{
       _tft->fillRect(x, y, w, h, color);
     }
   }
+  void drawBitmap(int16_t x, int16_t y, uint8_t* dta, uint16_t w, uint16_t h, uint16_t color){
+    y=(y+v_offset)%HEIGHT;
+    _tft->drawBitmap(x, y, dta, w, h, color);
+  }
  private:
   uint16_t v_offset;
   MCUFRIEND_kbv* _tft;
@@ -83,7 +102,7 @@ class Player{
   Player(){ // init physics values
     width=25;
     height=25;
-    x = (WIDTH-width)/2;
+    x = 0;//(WIDTH-width)/2;
     y = 150;
     prev_x = x;
     prev_y = y;
@@ -93,8 +112,19 @@ class Player{
     color = RED;
     score = 0;
   }
+  void render_score(){
+    return;
+    int8_t digits = score>0 ? log10(score) : 0; // number of digits in score
+    vtft.fillRect(1, HEIGHT-2-6, (digits+1)*5, 5, BLACK);
+    for(uint8_t i = 0; i<=digits; ++i){ // itterate right to left
+      uint8_t working_digit = score/(ipow(10, i))%10; // get the ith digit of score
+      uint8_t x_offset = 5*i+1; // how far off from the edge of the screen should digit be displayed
+      vtft.drawBitmap(x_offset, HEIGHT-2-5, font[working_digit], 3, 5, BLUE);
+    }
+  }
   void force_render(){ // render without any fancy caluclations -- used for first render
-    vtft.fillRect(prev_x, prev_y, width, height, color);
+    vtft.fillRect(prev_x, prev_y, width, height, color); // render player
+    render_score();
   }
   void render(){
     if((uint16_t)x == (uint16_t)prev_x && (uint16_t)y == (uint16_t)prev_y)
@@ -209,6 +239,7 @@ class Player{
 	left = prev_x;
     }
     clearRect(left, bottom, right, top);
+    render_score();
   }
   boolean calc_next_pos(double time){
     prev_x = x;
@@ -350,7 +381,7 @@ void setup() {
   tft.fillScreen(BLACK);
   Wire.begin();
   mpu6050.begin();
-  mpu6050.calcGyroOffsets(true);
+  // mpu6050.calcGyroOffsets(true);
   
   scroll_and_generate(HEIGHT); // create a fresh set of platforms
   // create a floor for the player to start on
@@ -383,6 +414,7 @@ void loop() {
     player.prev_y = player.y;
     player.x_speed = 0;
     player.y_speed = 0;
+    player.score = 0;
     player.force_render(); // and draw the player
     platforms.clear(); // get rid of the platforms
     scroll_and_generate(HEIGHT); // create a fresh set of platforms
