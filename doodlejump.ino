@@ -8,7 +8,7 @@ int16_t ilog2(uint16_t x)
 {
     return sizeof(uint16_t) * CHAR_BIT - __builtin_clz(x) - 1;
 }
-int ipow(int x, int p)
+int ipow(int x, int p) // faster than stock
 {
   if (p == 0) return 1;
   if (p == 1) return x;
@@ -123,13 +123,13 @@ class Player{
 		      , font[10].height
 		      , BLUE);
     for(uint8_t i = 0; i<=digits; ++i){ // itterate right to left
-      _Digit working_digit = font[(int)score/((int)pow(10, i))%10]; // get the ith digit of score
+      _Digit working_digit = font[(int)score/((int)ipow(10, i))%10]; // get the ith digit of score
       x_tot += working_digit.width; 
       //vtft.drawBitmap(x_offset, HEIGHT/2, font[working_digit], 3, 5, BLUE);
     }
     uint16_t x_offset = (WIDTH-x_tot)/2;
     for(uint8_t i = 0; i<=digits; ++i){ // itterate right to left
-      _Digit working_digit = font[(int)score/((int)pow(10, i))%10]; // get the ith digit of score
+      _Digit working_digit = font[(int)score/((int)ipow(10, i))%10]; // get the ith digit of score
       vtft.drawBitmap(x_offset
 		      , h_offset
 		      , working_digit.data
@@ -387,7 +387,7 @@ void scroll_and_generate(uint16_t distance){
   }while(i++<HEIGHT); // and work towards the top
 }
 
-int32_t gyro_meta_offset; // need a second offset because the gyro drifts a lot
+int32_t gyro_meta_offset = 0; // need a second offset because gyro doesn't init at 0
 void setup() {
   // first, all the boring inits
   Serial.begin(115200);
@@ -398,7 +398,6 @@ void setup() {
   tft.fillScreen(BLACK);
   Wire.begin();
   mpu6050.begin();
-  // mpu6050.calcGyroOffsets(true);
   
   scroll_and_generate(HEIGHT); // create a fresh set of platforms
   // create a floor for the player to start on
@@ -412,7 +411,7 @@ void setup() {
 
   // calibrate gyro
   mpu6050.update();
-  gyro_meta_offset = mpu6050.getAngleZ();
+  gyro_meta_offset = mpu6050.getAngleX();
 }
 
 
@@ -425,7 +424,7 @@ void loop() {
     platforms.clear(); // get rid of the platforms
     tft.fillScreen(BLACK); // clear the screen
     player.render_score();
-    delay(2000);
+    delay(3000);
     tft.fillScreen(BLACK);
     player.x = (WIDTH-player.width)/2; // put the player back at start
     player.y = 150;
