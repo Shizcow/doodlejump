@@ -424,26 +424,9 @@ void loop() {
     platforms.clear(); // get rid of the platforms
     tft.fillScreen(BLACK); // clear the screen
     player.render_score();
+    player.render_score(); // do it twice -- sometimes it brakes for an unknown reason
     delay(3000);
-    tft.fillScreen(BLACK);
-    player.x = (WIDTH-player.width)/2; // put the player back at start
-    player.y = 150;
-    player.prev_x = player.x;
-    player.prev_y = player.y;
-    player.x_speed = 0;
-    player.y_speed = 0;
-    player.score = 0;
-    player.force_render(); // and draw the player
-    scroll_and_generate(HEIGHT); // create a fresh set of platforms
-    // create a floor for the player to start on
-    Platform floor;
-    floor.y = 0;
-    floor.w = WIDTH-1;
-    floor.x = 0;
-    platforms.push_back(floor);
-    vtft.fillRect(floor.x, floor.y, floor.w, 1, WHITE);
-    mpu6050.update(); // finally, recalibrate the gyro and start over
-    gyro_meta_offset = mpu6050.getAngleX();
+    asm volatile ("  jmp 0");   // magic to reset arduino
   }
 
 }

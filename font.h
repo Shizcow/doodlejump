@@ -75,7 +75,8 @@ static const uint8_t _D0[] PROGMEM = {
 };
 
 static const _Digit D0 PROGMEM = {46, 68, _D0};
-
+	      
+// width x height = 22,68
 static const uint8_t _D1[] PROGMEM = {
 	0x00,0x03,0xfc,
 	0x00,0x03,0xfc,
@@ -146,8 +147,7 @@ static const uint8_t _D1[] PROGMEM = {
 	0xff,0x00,0x00,
 	0xff,0x00,0x00
 };
-				      
-// width x height = 22,68
+			
 static const _Digit D1 PROGMEM = {22, 68, _D1};
 
 
