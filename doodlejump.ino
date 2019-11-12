@@ -75,7 +75,7 @@ class Vtft{
       _tft->fillRect(x, y, w, h, color);
     }
   }
-  void drawBitmap(int16_t x, int16_t y, uint8_t* dta, uint16_t w, uint16_t h, uint16_t color){
+  void drawBitmap(int16_t x, int16_t y, const uint8_t* dta, uint16_t w, uint16_t h, uint16_t color){
     y=(y+v_offset)%HEIGHT;
     _tft->drawBitmap(x, y, dta, w, h, color);
   }
@@ -113,18 +113,34 @@ class Player{
     score = 0;
   }
   void render_score(){
-    return;
     int8_t digits = score>0 ? log10(score) : 0; // number of digits in score
-    vtft.fillRect(1, HEIGHT-2-6, (digits+1)*5, 5, BLACK);
+    uint16_t x_tot = 0;
+    uint16_t h_offset = (HEIGHT-font[0].height-font[10].height)/2-20;
+    vtft.drawBitmap((WIDTH-font[10].width)/2
+		      , h_offset+font[10].height+40
+		      , font[10].data
+		      , font[10].width
+		      , font[10].height
+		      , BLUE);
     for(uint8_t i = 0; i<=digits; ++i){ // itterate right to left
-      uint8_t working_digit = score/(ipow(10, i))%10; // get the ith digit of score
-      uint8_t x_offset = 5*i+1; // how far off from the edge of the screen should digit be displayed
-      vtft.drawBitmap(x_offset, HEIGHT-2-5, font[working_digit], 3, 5, BLUE);
+      _Digit working_digit = font[(int)score/((int)pow(10, i))%10]; // get the ith digit of score
+      x_tot += working_digit.width; 
+      //vtft.drawBitmap(x_offset, HEIGHT/2, font[working_digit], 3, 5, BLUE);
+    }
+    uint16_t x_offset = (WIDTH-x_tot)/2;
+    for(uint8_t i = 0; i<=digits; ++i){ // itterate right to left
+      _Digit working_digit = font[(int)score/((int)pow(10, i))%10]; // get the ith digit of score
+      vtft.drawBitmap(x_offset
+		      , h_offset
+		      , working_digit.data
+		      , working_digit.width
+		      , font[0].height // same for all
+		      , BLUE);
+      x_offset += working_digit.width;
     }
   }
   void force_render(){ // render without any fancy caluclations -- used for first render
     vtft.fillRect(prev_x, prev_y, width, height, color); // render player
-    render_score();
   }
   void render(){
     if((uint16_t)x == (uint16_t)prev_x && (uint16_t)y == (uint16_t)prev_y)
@@ -239,7 +255,6 @@ class Player{
 	left = prev_x;
     }
     clearRect(left, bottom, right, top);
-    render_score();
   }
   boolean calc_next_pos(double time){
     prev_x = x;
@@ -376,6 +391,8 @@ int32_t gyro_meta_offset; // need a second offset because the gyro drifts a lot
 void setup() {
   // first, all the boring inits
   Serial.begin(115200);
+  tft.fillScreen(BLACK);
+    
   uint16_t ID = tft.readID();
   tft.begin(ID); 
   tft.fillScreen(BLACK);
@@ -402,12 +419,14 @@ void setup() {
 void loop() {
   // tilt controls
   mpu6050.update();
-  player.x_speed = (mpu6050.getAngleZ()-gyro_meta_offset)/5;
-
-  //delay(1); // delay just enough to make physics feel consistant
+  player.x_speed = (mpu6050.getAngleX()-gyro_meta_offset)/5;
 
   if(!player.calc_next_pos(0.01)){ // calculate position. If this returns false (if statement is true), game over
+    platforms.clear(); // get rid of the platforms
     tft.fillScreen(BLACK); // clear the screen
+    player.render_score();
+    delay(2000);
+    tft.fillScreen(BLACK);
     player.x = (WIDTH-player.width)/2; // put the player back at start
     player.y = 150;
     player.prev_x = player.x;
@@ -416,7 +435,6 @@ void loop() {
     player.y_speed = 0;
     player.score = 0;
     player.force_render(); // and draw the player
-    platforms.clear(); // get rid of the platforms
     scroll_and_generate(HEIGHT); // create a fresh set of platforms
     // create a floor for the player to start on
     Platform floor;
@@ -426,7 +444,7 @@ void loop() {
     platforms.push_back(floor);
     vtft.fillRect(floor.x, floor.y, floor.w, 1, WHITE);
     mpu6050.update(); // finally, recalibrate the gyro and start over
-    gyro_meta_offset = mpu6050.getAngleZ();
+    gyro_meta_offset = mpu6050.getAngleX();
   }
 
 }
