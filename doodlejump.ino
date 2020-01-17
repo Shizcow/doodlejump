@@ -428,5 +428,4 @@ void loop() {
     delay(3000);
     asm volatile ("  jmp 0");   // magic to reset arduino
   }
-
 }
