@@ -2,10 +2,8 @@
 This is a simple game, made for arduino and a TFT display. 
 
 Tested with: 
-
--Arduino Mega 2560 
-
--2.8" TFT display
+- Arduino Mega 2560 
+- 2.8" TFT display
 
 Compiled using Arduino.mk. Will also compile with Arduino IDE, so long as the correct libraries are installed.
 For a list of libraries, see the Makefile. All these libraries are available through Arduino IDE.
